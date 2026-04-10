@@ -11,7 +11,7 @@ class Dome < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/dome-systems/releases/releases/download/v0.1.0/dome_0.1.0_darwin_amd64.tar.gz"
-      sha256 "cb605d0a72338b994b7a81a10cb6f4c41c14319f2223fce8fb5870860e170a15"
+      sha256 "5af38e1d3480be3cb2eda2950f78191556e5736ce34ebe260909a39162d0255d"
 
       define_method(:install) do
         bin.install "dome"
@@ -19,7 +19,7 @@ class Dome < Formula
     end
     if Hardware::CPU.arm?
       url "https://github.com/dome-systems/releases/releases/download/v0.1.0/dome_0.1.0_darwin_arm64.tar.gz"
-      sha256 "2b5319b36d1e82b7676ec994219283994d243e903f19167e9308430275058649"
+      sha256 "6e2feac2145ffa1a08e114c5a0fe0b1c9846d1599cd8a0c2eac5dfd11e9843bc"
 
       define_method(:install) do
         bin.install "dome"
@@ -30,14 +30,14 @@ class Dome < Formula
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
       url "https://github.com/dome-systems/releases/releases/download/v0.1.0/dome_0.1.0_linux_amd64.tar.gz"
-      sha256 "9daf8b28c599ea2ad00adadffdb85938d670bd71d1f49bebd4718147c6b0d6d7"
+      sha256 "23685bbf748948d371df8cff7e4d189e440074231b506ea5d785137ea509d32c"
       define_method(:install) do
         bin.install "dome"
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
       url "https://github.com/dome-systems/releases/releases/download/v0.1.0/dome_0.1.0_linux_arm64.tar.gz"
-      sha256 "cb662cb2d9254f8c14487b27261787b35c7fff70afdd221f905f4b8dd269ef09"
+      sha256 "9f7c7c2d885661c35c31a23ec0012d6cc0be54fa294824e34de196b79d4f2bee"
       define_method(:install) do
         bin.install "dome"
       end
