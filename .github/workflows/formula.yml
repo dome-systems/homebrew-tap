@@ -1,0 +1,129 @@
+# Checks every change to this tap before it can reach `brew install dome`.
+#
+# Formula PRs are opened by `scripts/release-cli.sh apply` in
+# dome-systems/prod-dome (runbook: docs/releasing-the-cli.md there). Every job
+# below is a required status check on main, alongside the one approving review.
+#
+#   verify-release   `brew style`, then .github/scripts/verify-release.sh: the
+#                    formula points only at a published dome-systems/releases
+#                    release, for all four platforms, with checksums that match
+#                    the archives and the release's checksums.txt; no downgrade
+#                    from main, and no published version's checksums changing.
+#   install (<os>_<arch>)
+#                    on that real OS/arch, brew resolves that platform's archive,
+#                    installs it, `brew test` passes, and the binary reports the
+#                    formula's version.
+#
+# A deliberate rollback to an older version needs the `rollback` label on the PR.
+#
+# No `paths:` filter on purpose: a required check that never runs leaves the PR
+# blocked forever.
+name: formula
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formula-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_ANALYTICS: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Taps and trusts this checkout as dome-systems/tap.
+      - name: Set up Homebrew
+        id: brew
+        uses: Homebrew/actions/setup-homebrew@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
+
+      - name: brew style
+        run: brew style dome-systems/tap/dome
+
+      - name: Fetch main's formula to compare against
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/contents/Formula/dome.rb?ref=$BASE_SHA" --jq .content \
+            | base64 --decode >"$RUNNER_TEMP/base-dome.rb"
+
+      - name: Verify the release behind the formula
+        working-directory: ${{ steps.brew.outputs.repository-path }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALLOW_DOWNGRADE: ${{ contains(github.event.pull_request.labels.*.name, 'rollback') }}
+        run: |
+          base=()
+          if [[ -f "$RUNNER_TEMP/base-dome.rb" ]]; then base=("$RUNNER_TEMP/base-dome.rb"); fi
+          .github/scripts/verify-release.sh Formula/dome.rb "${base[@]}"
+
+  install:
+    name: install (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: darwin_arm64, runner: macos-latest }
+          - { platform: darwin_amd64, runner: macos-15-intel }
+          - { platform: linux_amd64, runner: ubuntu-latest }
+          - { platform: linux_arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
+
+      # The formula picks its archive with `Hardware::CPU` checks, which brew's
+      # simulated-platform evaluation does not follow, so only a real machine
+      # proves each platform gets its own archive.
+      - name: brew resolves this platform's archive
+        id: resolve
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          info=$(brew info --json=v2 dome-systems/tap/dome)
+          version=$(jq -r '.formulae[0].versions.stable' <<<"$info")
+          url=$(jq -r '.formulae[0].urls.stable.url' <<<"$info")
+          want="https://github.com/dome-systems/releases/releases/download/v$version/dome_${version}_$PLATFORM.tar.gz"
+          echo "brew resolves: $url"
+          if [[ $url != "$want" ]]; then
+            echo "::error::on $PLATFORM brew resolves $url, want $want"
+            exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+      - name: brew install
+        run: brew install --formula dome-systems/tap/dome
+
+      - name: brew test
+        run: brew test dome-systems/tap/dome
+
+      - name: dome reports the formula's version
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          out=$("$(brew --prefix)/bin/dome" version)
+          echo "$out"
+          if ! grep -Eq "(^|[^0-9A-Za-z.])v?${VERSION//./\\.}([^0-9A-Za-z.]|$)" <<<"$out"; then
+            echo "::error::dome version does not report $VERSION"
+            exit 1
+          fi
