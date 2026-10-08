@@ -14,7 +14,8 @@
 #   unverified   the review could not complete; re-request review from dome-bot
 #
 # It runs on every change to a PR, including edits to the title or description,
-# because those are not pushes and an approval otherwise outlives them.
+# because those are not pushes and an approval otherwise outlives them, and label
+# changes, because the `rollback` label changes what integrity allows.
 #
 # Safety:
 #   - pull_request_target, so this file and the scripts it runs come from main,
@@ -32,7 +33,7 @@ name: review
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, edited, ready_for_review, review_requested]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review, review_requested]
 
 permissions:
   contents: read
