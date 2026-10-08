@@ -1,8 +1,8 @@
 # Checks every change to this tap before it can reach `brew install dome`.
 #
-# Formula PRs are opened by `scripts/release-cli.sh apply` in
-# dome-systems/prod-dome (runbook: docs/releasing-the-cli.md there). Every job
-# below is a required status check on main, alongside the one approving review.
+# Formula PRs are opened by the dome release tooling once a release is
+# published. Every job below is a required status check on main, alongside the
+# one approving review.
 #
 #   verify-release   `brew style`, then .github/scripts/verify-release.sh: the
 #                    formula points only at a published dome-systems/releases
