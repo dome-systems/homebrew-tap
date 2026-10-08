@@ -1,0 +1,129 @@
+# Reviews every pull request to this tap as the dome-agents App, and submits
+# APPROVE or REQUEST_CHANGES. Its approval counts toward main's required review.
+#
+# The review is one fixed line, "Approved." or "Changes requested: <category>.",
+# and the reviewer posts nothing else: no comments, no findings, no quotes. This
+# repository is public and everything posted to it is permanent, so the review
+# must never itself become something that needs deleting. The categories, from
+# .github/scripts/review-pr.sh:
+#
+#   authority    from a fork, or opened or pushed to by someone outside RELEASERS
+#   credential   adds something that looks like a secret
+#   disclosure   adds internal detail
+#   integrity    the formula fails verify-release.sh
+#   unverified   the review could not complete; re-request review from dome-bot
+#
+# It runs on every change to a PR, including edits to the title or description,
+# because those are not pushes and an approval otherwise outlives them, and label
+# changes, because the `rollback` label changes what integrity allows.
+#
+# Safety:
+#   - pull_request_target, so this file and the scripts it runs come from main,
+#     never from the PR: a PR cannot rewrite the reviewer that approves it. PR
+#     content is fetched through the API and treated as data; nothing from the
+#     PR is executed.
+#   - Run logs here are public. Nothing prints PR content, the term list, or
+#     model output; only the verdict reaches the log.
+#   - The review decision runs with the read-only workflow token. The App token,
+#     the only credential that can post a review, is minted after the decision
+#     and used for nothing else.
+#   - Fail closed: if the decision errors, the PR gets "Changes requested:
+#     unverified" rather than keeping an earlier approval.
+name: review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review, review_requested]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  review:
+    # Requesting dome-bot (the handle GitHub's reviewer picker offers) or the App
+    # re-runs the review; requesting anyone else is not a reason to.
+    if: >-
+      github.event.action != 'review_requested' ||
+      github.event.requested_reviewer.login == 'dome-bot' ||
+      github.event.requested_reviewer.login == 'dome-agents[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Decide
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASERS: mceravolo-ds leckert-dome
+          DISCLOSURE_TERMS: ${{ secrets.TAP_REVIEW_DISCLOSURE_TERMS }}
+          ANTHROPIC_API_KEY: ${{ secrets.DOME_AGENTS_TAP_REVIEW_ANTHROPIC_KEY }}
+        run: |
+          if ! out=$(.github/scripts/review-pr.sh review "$PR_NUMBER"); then out="unverified $EVENT_HEAD_SHA"; fi
+          read -r verdict sha <<<"$out"
+          case $verdict in
+            approve | skip | authority | credential | disclosure | integrity | unverified) ;;
+            *) verdict=unverified ;;
+          esac
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || sha=$EVENT_HEAD_SHA
+          echo "verdict: $verdict"
+          {
+            echo "verdict=$verdict"
+            echo "sha=$sha"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Mint dome-agents token
+        if: steps.decide.outputs.verdict != 'skip'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.DOME_AGENTS_APP_ID }}
+          private-key: ${{ secrets.DOME_AGENTS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-pull-requests: write
+
+      # Posts only when the verdict differs from dome-agents' latest review of
+      # this head, so edits that change nothing add nothing to the PR.
+      - name: Submit review
+        if: steps.decide.outputs.verdict != 'skip'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERDICT: ${{ steps.decide.outputs.verdict }}
+          SHA: ${{ steps.decide.outputs.sha }}
+          REQUESTED: ${{ github.event.requested_reviewer.login }}
+        run: |
+          if [[ $VERDICT == approve ]]; then
+            event=APPROVE state=APPROVED body="Approved."
+          else
+            event=REQUEST_CHANGES state=CHANGES_REQUESTED body="Changes requested: $VERDICT."
+          fi
+          last=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" \
+            | jq -r '[.[][] | select(.user.login == "dome-agents[bot]")] | last // {} | "\(.state) \(.commit_id) \(.body)"')
+          if [[ $last == "$state $SHA $body" ]]; then
+            echo "unchanged since the last review"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+              -f commit_id="$SHA" -f event="$event" -f body="$body" --silent
+          fi
+          # A request for the dome-bot stand-in stays pending after the App answers.
+          if [[ $REQUESTED == dome-bot ]]; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
+              -f 'reviewers[]=dome-bot' --silent || true
+          fi
