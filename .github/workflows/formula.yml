@@ -52,7 +52,7 @@ jobs:
       # Taps and trusts this checkout as dome-systems/tap.
       - name: Set up Homebrew
         id: brew
-        uses: Homebrew/actions/setup-homebrew@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
+        uses: Homebrew/actions/setup-homebrew@4790763c0a3ba4036f72634dc079c4a7dfcd4878 # 2026.10.19.1
 
       - name: brew style
         run: brew style dome-systems/tap/dome
@@ -90,7 +90,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
+        uses: Homebrew/actions/setup-homebrew@4790763c0a3ba4036f72634dc079c4a7dfcd4878 # 2026.10.19.1
 
       # The formula picks its archive with `Hardware::CPU` checks, which brew's
       # simulated-platform evaluation does not follow, so only a real machine
