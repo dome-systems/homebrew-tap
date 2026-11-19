@@ -70,7 +70,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RELEASERS: mceravolo-ds leckert-dome
+          RELEASERS: mceravolo-ds leckert-dome gcookseyds
           DISCLOSURE_TERMS: ${{ secrets.TAP_REVIEW_DISCLOSURE_TERMS }}
           ANTHROPIC_API_KEY: ${{ secrets.DOME_AGENTS_TAP_REVIEW_ANTHROPIC_KEY }}
         run: |
