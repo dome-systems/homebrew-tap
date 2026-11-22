@@ -97,6 +97,13 @@ sha256() {
   if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{ print $1 }'
 }
 
+# fetch <url> <file> → downloads <url> without credentials. A release's assets
+# can 404 for a minute or two after it is published, and curl's plain --retry
+# never retries a 404, so every error is retried for about two minutes.
+fetch() {
+  curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors -o "$2" "$1"
+}
+
 formula=${1:?usage: verify-release.sh <formula> [<base-formula>]}
 base=${2:-}
 
@@ -130,13 +137,13 @@ ok "release published: $(jq -r .url <<<"$release")"
 # 4. Each archive downloads without credentials and matches the formula and checksums.txt.
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-curl -fsSL --retry 3 -o "$tmp/checksums.txt" "$download/checksums.txt" \
+fetch "$download/checksums.txt" "$tmp/checksums.txt" \
   || die "checksums.txt for v$version is not downloadable without credentials"
 for p in $PLATFORMS; do
   name="dome_${version}_$p.tar.gz"
   want=$(field "$parsed" sha "$download/$name")
   listed=$(awk -v n="$name" '$2 == n || $2 == "*" n { print $1 }' "$tmp/checksums.txt")
-  if ! curl -fsSL --retry 3 -o "$tmp/$name" "$download/$name"; then
+  if ! fetch "$download/$name" "$tmp/$name"; then
     err "$name is not downloadable without credentials"
     continue
   fi
