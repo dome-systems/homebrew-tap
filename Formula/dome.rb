@@ -5,21 +5,21 @@
 class Dome < Formula
   desc "CLI for governing AI agents with the Dome Platform"
   homepage "https://domesystems.ai"
-  version "1.11.0"
+  version "1.12.0"
   license "Apache-2.0"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/dome-systems/releases/releases/download/v1.11.0/dome_1.11.0_darwin_amd64.tar.gz"
-      sha256 "29869309e65f8a84c040a6224c6f8915fce650377b2ace3e267f6334d72c98e3"
+      url "https://github.com/dome-systems/releases/releases/download/v1.12.0/dome_1.12.0_darwin_amd64.tar.gz"
+      sha256 "ebbbf405faa419b7c59eaae7090c0b5911a47540d44ddc12c92609e401777378"
 
       define_method(:install) do
         bin.install "dome"
       end
     end
     if Hardware::CPU.arm?
-      url "https://github.com/dome-systems/releases/releases/download/v1.11.0/dome_1.11.0_darwin_arm64.tar.gz"
-      sha256 "9a44e43b3a37a64ea9ffdbd571a4a4ad1cd4c358eec1799973fa448be3f2f9e2"
+      url "https://github.com/dome-systems/releases/releases/download/v1.12.0/dome_1.12.0_darwin_arm64.tar.gz"
+      sha256 "9c01134b0644a0e72ca7fc4b4747617031aa7f8dccd4cbd7c0cd98f6db09ab6e"
 
       define_method(:install) do
         bin.install "dome"
@@ -29,15 +29,15 @@ class Dome < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/dome-systems/releases/releases/download/v1.11.0/dome_1.11.0_linux_amd64.tar.gz"
-      sha256 "cc541be2e11b1bfc0fc6dd6ba0f34dcea8ad5acd21193ca0c28bf31cb328c53e"
+      url "https://github.com/dome-systems/releases/releases/download/v1.12.0/dome_1.12.0_linux_amd64.tar.gz"
+      sha256 "0f403c667c33df32cfa901f845212de05897ecb8c65fecd601baf77c53f42d43"
       define_method(:install) do
         bin.install "dome"
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/dome-systems/releases/releases/download/v1.11.0/dome_1.11.0_linux_arm64.tar.gz"
-      sha256 "7ed71449954c0ad4b3efd49434de389f75ed1401b109db1e6cd8ebd9647ac3a4"
+      url "https://github.com/dome-systems/releases/releases/download/v1.12.0/dome_1.12.0_linux_arm64.tar.gz"
+      sha256 "ae9bf27e9b26995e2b5bc79fba61010abf6fb1e30597851686b95d81e41d963f"
       define_method(:install) do
         bin.install "dome"
       end
